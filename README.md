@@ -4,37 +4,58 @@
 
 ## 主要特性
 
-- ✅ **多策略支持**: Dual Thrust、均线交叉、MACD、RSI、布林带、KDJ 等多种技术指标策略
-- ✅ **智能建议系统**: 根据用户实际持仓和成本价，提供针对性的买卖建议
-- ✅ **盈亏分析**: 自动计算持仓盈亏金额和比例，给出合理的止盈止损建议
-- ✅ **分红处理**: 自动计算分红收益，提供更准确的回测结果
-- ✅ **数据管理**: 支持从 baostock 下载 A 股数据，本地缓存管理
-- ✅ **完整测试**: 包含 41 个单元测试用例，确保代码质量
+### 核心策略
+- ✅ **技术指标策略**: Dual Thrust、均线交叉、MACD、RSI、布林带、KDJ 等
+- ✅ **多因子选股**: 价值、成长、质量、动量四大类因子模型
+- ✅ **动量策略**: 价格动量、时间序列动量、横截面动量、盈余动量
+- ✅ **配对交易**: 协整检验、价差交易、统计套利
+
+### 风险管理
+- ✅ **仓位管理**: 凯利公式、固定分数法、波动率调整、风险平价
+- ✅ **止损策略**: 固定止损、ATR止损、移动止损、SAR止损
+- ✅ **风险监控**: 最大回撤控制、VaR/CVaR计算、风险报告生成
+
+### 回测分析
+- ✅ **交易成本**: 佣金、印花税、滑点模型
+- ✅ **性能指标**: 夏普比率、索提诺比率、卡玛比率、信息比率
+- ✅ **参数优化**: 网格搜索、随机搜索、遗传算法、滚动前向分析
+
+### 其他功能
+- ✅ **智能建议**: 根据用户实际持仓和成本价，提供针对性建议
+- ✅ **分红处理**: 自动计算分红收益，提高回测准确性
+- ✅ **数据管理**: baostock数据源，本地缓存管理
+- ✅ **完整测试**: 单元测试覆盖，确保代码质量
 
 ## 项目结构
 
 ```
 trade/
-├── data/                    # 本地数据存储目录
-│   ├── *.csv               # 股票价格数据
-│   └── *_dividend.csv      # 分红数据
-├── tests/                   # 单元测试
+├── data/                       # 本地数据存储目录
+│   ├── *.csv                  # 股票价格数据
+│   └── *_dividend.csv         # 分红数据
+├── tests/                      # 单元测试
 │   ├── __init__.py
 │   ├── test_data_manager.py
 │   └── test_strategies.py
-├── data_manager.py          # 数据管理模块
-├── download_data.py         # 数据下载脚本
-├── main.py                  # 主程序入口
-├── dual_thrust.py           # Dual Thrust 策略
-├── ma_crossover.py          # 均线交叉策略
-├── macd_strategy.py         # MACD 策略
-├── rsi_strategy.py          # RSI 策略
-├── boll_strategy.py         # 布林带策略
-├── kdj_strategy.py          # KDJ 策略
-├── rebalance_backtest.py    # 再平衡策略
-├── pyproject.toml           # 项目配置文件
-├── requirements.txt         # 核心依赖
-└── requirements-dev.txt     # 开发依赖
+├── data_manager.py             # 数据管理模块
+├── download_data.py            # 数据下载脚本
+├── main.py                     # 主程序入口
+├── dual_thrust.py              # Dual Thrust 策略
+├── ma_crossover.py             # 均线交叉策略
+├── macd_strategy.py            # MACD 策略
+├── rsi_strategy.py             # RSI 策略
+├── boll_strategy.py            # 布林带策略
+├── kdj_strategy.py             # KDJ 策略
+├── rebalance_backtest.py       # 再平衡策略
+├── multi_factor.py             # 多因子选股策略 ⭐ 新增
+├── momentum_strategy.py        # 动量策略 ⭐ 新增
+├── pair_trading.py             # 配对交易策略 ⭐ 新增
+├── risk_manager.py             # 风险管理模块 ⭐ 新增
+├── backtest_analytics.py       # 回测分析模块 ⭐ 新增
+├── parameter_optimizer.py      # 参数优化模块 ⭐ 新增
+├── pyproject.toml              # 项目配置文件
+├── requirements.txt            # 核心依赖
+└── requirements-dev.txt        # 开发依赖
 ```
 
 ## 功能特性
@@ -47,6 +68,7 @@ trade/
 
 ### 支持的策略
 
+#### 技术指标策略
 | 策略 | 文件 | 说明 |
 |------|------|------|
 | Dual Thrust | `dual_thrust.py` | 突破策略，基于价格区间突破 |
@@ -57,11 +79,48 @@ trade/
 | KDJ | `kdj_strategy.py` | KDJ 超买超卖金叉死叉 |
 | 再平衡 | `rebalance_backtest.py` | 资产配置再平衡策略 |
 
+#### ⭐ 新增策略模块
+
+| 策略类型 | 文件 | 核心功能 |
+|---------|------|---------|
+| 多因子选股 | `multi_factor.py` | 价值因子(PE/PB)、成长因子、质量因子、动量因子 |
+| 动量策略 | `momentum_strategy.py` | 价格动量、时间序列动量、横截面动量、盈余动量 |
+| 配对交易 | `pair_trading.py` | 协整检验、价差交易、统计套利、三角套利 |
+
+#### ⭐ 风险管理模块
+
+| 功能 | 文件 | 说明 |
+|-----|------|------|
+| 仓位管理 | `risk_manager.py` | 凯利公式、固定分数法、波动率调整、风险平价 |
+| 止损策略 | `risk_manager.py` | 固定止损、ATR止损、移动止损、SAR止损 |
+| 风险监控 | `risk_manager.py` | 最大回撤控制、VaR/CVaR计算、风险报告 |
+
+#### ⭐ 回测分析模块
+
+| 功能 | 文件 | 说明 |
+|-----|------|------|
+| 交易成本 | `backtest_analytics.py` | 佣金、印花税、滑点模型 |
+| 性能指标 | `backtest_analytics.py` | 夏普比率、索提诺比率、卡玛比率、信息比率 |
+| 回测报告 | `backtest_analytics.py` | 完整回测报告、月度/年度收益分析 |
+
+#### ⭐ 参数优化模块
+
+| 优化方法 | 文件 | 说明 |
+|---------|------|------|
+| 网格搜索 | `parameter_optimizer.py` | 全参数空间搜索 |
+| 随机搜索 | `parameter_optimizer.py` | 随机采样参数组合 |
+| 遗传算法 | `parameter_optimizer.py` | 进化算法优化参数 |
+| 滚动前向 | `parameter_optimizer.py` | 样本外测试验证 |
+| 交叉验证 | `parameter_optimizer.py` | K折交叉验证 |
+
 ### 回测功能
 - 完整的回测引擎
 - 支持分红收益计算
 - 年化收益率、夏普比率等指标
 - 最大回撤分析
+- ⭐ 交易成本模型(佣金、印花税、滑点)
+- ⭐ 完整性能指标(夏普、索提诺、卡玛、信息比率)
+- ⭐ 参数优化与样本外测试
 
 ## 安装
 
