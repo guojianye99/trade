@@ -17,6 +17,9 @@ import dual_thrust
 import ma_crossover
 import macd_strategy
 import rebalance_backtest
+import rsi_strategy
+import boll_strategy
+import kdj_strategy
 
 # 默认配置
 DEFAULT_SYMBOL = 'sh.601138'
@@ -157,6 +160,36 @@ def run_rebalance(symbols, capital):
         return None
 
 
+def run_rsi(symbol, capital):
+    """运行 RSI 策略"""
+    try:
+        result = rsi_strategy.run(symbol=symbol, start_date=START_DATE, capital=capital)
+        return result
+    except Exception as e:
+        print(f"RSI 策略执行失败: {e}")
+        return None
+
+
+def run_boll(symbol, capital):
+    """运行布林带策略"""
+    try:
+        result = boll_strategy.run(symbol=symbol, start_date=START_DATE, capital=capital)
+        return result
+    except Exception as e:
+        print(f"布林带策略执行失败: {e}")
+        return None
+
+
+def run_kdj(symbol, capital):
+    """运行 KDJ 策略"""
+    try:
+        result = kdj_strategy.run(symbol=symbol, start_date=START_DATE, capital=capital)
+        return result
+    except Exception as e:
+        print(f"KDJ 策略执行失败: {e}")
+        return None
+
+
 def print_summary(results, symbol, capital):
     """打印汇总结果"""
     print("\n")
@@ -191,41 +224,98 @@ def print_summary(results, symbol, capital):
         print(f"{'MACD Strategy':<20} {r['return']:>11.2f}% {r['annual']:>11.2f}% {r['trades']:>10} {r['dividends']:>11,.2f}")
         strategy_data.append(('MACD Strategy', r['return'], r['annual'], r))
     
+    if results['rsi']:
+        r = results['rsi']
+        print(f"{'RSI Strategy':<20} {r['return']:>11.2f}% {r['annual']:>11.2f}% {r['trades']:>10} {r['dividends']:>11,.2f}")
+        strategy_data.append(('RSI Strategy', r['return'], r['annual'], r))
+    
+    if results['boll']:
+        r = results['boll']
+        print(f"{'BOLL Strategy':<20} {r['return']:>11.2f}% {r['annual']:>11.2f}% {r['trades']:>10} {r['dividends']:>11,.2f}")
+        strategy_data.append(('BOLL Strategy', r['return'], r['annual'], r))
+    
+    if results['kdj']:
+        r = results['kdj']
+        print(f"{'KDJ Strategy':<20} {r['return']:>11.2f}% {r['annual']:>11.2f}% {r['trades']:>10} {r['dividends']:>11,.2f}")
+        strategy_data.append(('KDJ Strategy', r['return'], r['annual'], r))
+    
     print("-" * 70)
     
     # 找出最佳策略
     if strategy_data:
-        best = max(strategy_data, key=lambda x: x[1])
+        # 按收益排序
+        sorted_strategies = sorted(strategy_data, key=lambda x: x[1], reverse=True)
+        best = sorted_strategies[0]
         print(f"最佳策略: {best[0]} (收益: {best[1]:.2f}%)")
+        
+        # 显示策略排名
+        print("\n【策略表现排名】")
+        for i, (name, ret, annual, _) in enumerate(sorted_strategies, 1):
+            if ret > 0:
+                print(f"  {i}. {name}: {ret:.2f}% (年化 {annual:.2f}%)")
+            else:
+                print(f"  {i}. {name}: {ret:.2f}% (亏损)")
     
     # 买卖建议汇总
     print("\n" + "=" * 70)
     print("【当前买卖建议汇总】")
     print("=" * 70)
     
-    for strategy_name, _, _, result in strategy_data:
+    for strategy_name, total_return, annual_return, result in strategy_data:
         signal = result.get('current_signal', {})
         trend = result.get('trend', {})
         
         sig = signal.get('signal', '')
         confidence = signal.get('confidence', 0)
+        current_price = signal.get('current_price', 0)
         
         print(f"\n>>> {strategy_name}")
-        print(f"    当前信号: {sig}")
-        print(f"    信号强度: {confidence:.0f}%")
+        print(f"    历史收益: {total_return:.2f}% | 年化收益: {annual_return:.2f}%")
+        print(f"    当前价格: {current_price:.2f}")
+        print(f"    当前信号: {sig} | 信号强度: {confidence:.0f}%")
         print(f"    趋势判断: {trend.get('trend', 'N/A')} (强度: {trend.get('strength', 'N/A')})")
         
-        # 根据信号给出具体建议
+        # 根据策略类型和信号给出具体操作建议
         if sig == '买入':
-            print(f"    ★★★ 建议: 买入 ★★★")
+            print(f"    ★★★ 操作建议: 买入 ★★★")
+            print(f"    参考买入价: {current_price:.2f} 元")
+            # 根据不同策略给出止损止盈建议
+            if 'upper' in signal and 'lower' in signal:
+                print(f"    止损参考: {signal['lower']:.2f} 元 (下轨)")
+            elif 'ma_long' in signal:
+                print(f"    止损参考: {signal['ma_long']:.2f} 元 (长期均线)")
+            print(f"    建议仓位: 可分批建仓，首次 30-50%")
+            
         elif sig == '卖出':
-            print(f"    ★★★ 建议: 卖出 ★★★")
+            print(f"    ★★★ 操作建议: 卖出 ★★★")
+            print(f"    参考卖出价: {current_price:.2f} 元")
+            print(f"    建议操作: 如有持仓，建议全部卖出或减仓 70%")
+            
         elif '偏买' in sig:
-            print(f"    ★★ 建议: 关注买入机会 (多头趋势) ★★")
+            print(f"    ★★ 操作建议: 关注买入机会 ★★")
+            # 显示关键价位
+            if 'upper' in signal:
+                print(f"    突破买入价: {signal['upper']:.2f} 元")
+                print(f"    回调支撑价: {signal.get('lower', current_price * 0.95):.2f} 元")
+            elif 'ma_short' in signal and 'ma_long' in signal:
+                print(f"    参考买入价: {signal['ma_long']:.2f} 元附近 (长期均线支撑)")
+            print(f"    建议仓位: 小仓位试探 20-30%，突破后加仓")
+            print(f"    止损参考: 买入价下方 5-8%")
+            
         elif '偏卖' in sig:
-            print(f"    ★★ 建议: 注意风险 (空头趋势) ★★")
+            print(f"    ★★ 操作建议: 注意风险 ★★")
+            if 'rsi' in signal:
+                print(f"    RSI 值: {signal['rsi']:.1f} (超买区)")
+                print(f"    建议操作: 如有持仓可减仓 30-50%，等待回调")
+            else:
+                print(f"    建议操作: 如有持仓可适当减仓，控制风险")
+            print(f"    止盈参考: 当前价位或上涨 3-5%")
+            
         else:
-            print(f"    ★ 建议: 观望 (有仓持有，无仓等待) ★")
+            print(f"    ★ 操作建议: 观望 ★")
+            print(f"    等待明确信号再操作")
+            print(f"    如有持仓: 继续持有，设置止损")
+            print(f"    如无持仓: 暂不操作，等待机会")
     
     # 综合建议
     print("\n" + "-" * 70)
@@ -236,16 +326,34 @@ def print_summary(results, symbol, capital):
     bias_buy = sum(1 for _, _, _, r in strategy_data if '偏买' in r.get('current_signal', {}).get('signal', ''))
     bias_sell = sum(1 for _, _, _, r in strategy_data if '偏卖' in r.get('current_signal', {}).get('signal', ''))
     
-    if buy_count >= 2:
-        print("  多个策略发出买入信号，建议: 积极买入")
-    elif sell_count >= 2:
-        print("  多个策略发出卖出信号，建议: 及时卖出")
-    elif bias_buy >= 2:
-        print("  多个策略显示偏多信号，建议: 关注买入机会")
-    elif bias_sell >= 2:
-        print("  多个策略显示偏空信号，建议: 注意风险")
+    # 获取最佳策略的信号
+    sorted_strategies = sorted(strategy_data, key=lambda x: x[1], reverse=True)
+    best_strategy = sorted_strategies[0]
+    best_signal = best_strategy[3].get('current_signal', {}).get('signal', '')
+    
+    print(f"\n该股票最适合策略: {best_strategy[0]}")
+    print(f"  - 历史收益: {best_strategy[1]:.2f}%")
+    print(f"  - 年化收益: {best_strategy[2]:.2f}%")
+    print(f"  - 当前信号: {best_signal}")
+    
+    print(f"\n信号统计:")
+    print(f"  - 买入信号: {buy_count} 个")
+    print(f"  - 偏买信号: {bias_buy} 个")
+    print(f"  - 偏卖信号: {bias_sell} 个")
+    print(f"  - 卖出信号: {sell_count} 个")
+    
+    # 基于最佳策略给出建议
+    print(f"\n操作建议:")
+    if best_signal == '买入':
+        print(f"  ★★★ {best_strategy[0]} 发出买入信号，建议买入 ★★★")
+    elif best_signal == '卖出':
+        print(f"  ★★★ {best_strategy[0]} 发出卖出信号，建议卖出 ★★★")
+    elif '偏买' in best_signal:
+        print(f"  ★★ {best_strategy[0]} 显示偏多，关注买入机会 ★★")
+    elif '偏卖' in best_signal:
+        print(f"  ★★ {best_strategy[0]} 显示偏空，注意风险 ★★")
     else:
-        print("  各策略信号分化，建议: 保持观望，等待明确信号")
+        print(f"  ★ {best_strategy[0]} 建议: 观望 ★")
     
     print("=" * 70)
 
@@ -306,20 +414,35 @@ def main():
         'dual_thrust': None,
         'ma_crossover': None,
         'macd': None,
+        'rsi': None,
+        'boll': None,
+        'kdj': None,
         'rebalance': None
     }
     
     # Dual Thrust
-    print(f"\n[1/3] Dual Thrust 策略...")
+    print(f"\n[1/6] Dual Thrust 策略...")
     results['dual_thrust'] = run_dual_thrust(symbol, capital)
     
     # MA Crossover
-    print(f"\n[2/3] 均线交叉策略...")
+    print(f"\n[2/6] 均线交叉策略...")
     results['ma_crossover'] = run_ma_crossover(symbol, capital)
     
     # MACD
-    print(f"\n[3/3] MACD 策略...")
+    print(f"\n[3/6] MACD 策略...")
     results['macd'] = run_macd(symbol, capital)
+    
+    # RSI
+    print(f"\n[4/6] RSI 策略...")
+    results['rsi'] = run_rsi(symbol, capital)
+    
+    # BOLL
+    print(f"\n[5/6] 布林带策略...")
+    results['boll'] = run_boll(symbol, capital)
+    
+    # KDJ
+    print(f"\n[6/6] KDJ 策略...")
+    results['kdj'] = run_kdj(symbol, capital)
     
     # 打印汇总
     print_summary(results, symbol, capital)
