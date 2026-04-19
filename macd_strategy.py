@@ -45,7 +45,11 @@ def macd_strategy(df, fast_period=12, slow_period=26, signal_period=9):
                 'position': df['position'].iloc[i]
             })
     
-    return pd.DataFrame(records).set_index('date'), df
+    # 如果没有信号，返回带正确列的空 DataFrame
+    if records:
+        return pd.DataFrame(records).set_index('date'), df
+    else:
+        return pd.DataFrame(columns=['close', 'macd', 'signal', 'position']), df
 
 def get_current_signal(df, fast_period=12, slow_period=26, signal_period=9):
     """获取当前买卖信号"""
@@ -327,7 +331,9 @@ def run(symbol=None, start_date=None, end_date=None, capital=None,
         'return': total_return,
         'annual': annual_return,
         'current_signal': current_signal,
-        'trend': trend_info
+        'trend': trend_info,
+        'current_position': current_position,
+        'current_shares': current_position
     }
 
 if __name__ == "__main__":

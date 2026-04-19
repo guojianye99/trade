@@ -190,8 +190,16 @@ def run_kdj(symbol, capital):
         return None
 
 
-def print_summary(results, symbol, capital):
-    """打印汇总结果"""
+def print_summary(results, symbol, capital, user_shares=0, user_cost=0.0):
+    """打印汇总结果
+    
+    Args:
+        results: 各策略的结果
+        symbol: 股票代码
+        capital: 初始资金
+        user_shares: 用户实际持仓股数
+        user_cost: 用户持仓成本价
+    """
     print("\n")
     print("=" * 70)
     print("策略汇总报告")
@@ -199,6 +207,10 @@ def print_summary(results, symbol, capital):
     print(f"股票代码: {symbol}")
     print(f"初始资金: {capital:,} 元")
     print(f"回测区间: {START_DATE} ~ {datetime.now().strftime('%Y-%m-%d')}")
+    if user_shares > 0 and user_cost > 0:
+        print(f"用户持仓: {user_shares} 股, 成本价: {user_cost:.2f} 元")
+    elif user_shares > 0:
+        print(f"用户持仓: {user_shares} 股 (未提供成本价)")
     print("=" * 70)
     
     # 收益对比表
@@ -261,6 +273,9 @@ def print_summary(results, symbol, capital):
     print("【当前买卖建议汇总】")
     print("=" * 70)
     
+    # 用户实际持仓状态
+    has_user_position = user_shares > 0
+    
     for strategy_name, total_return, annual_return, result in strategy_data:
         signal = result.get('current_signal', {})
         trend = result.get('trend', {})
@@ -269,53 +284,156 @@ def print_summary(results, symbol, capital):
         confidence = signal.get('confidence', 0)
         current_price = signal.get('current_price', 0)
         
+        # 计算盈亏情况
+        profit_loss = 0.0
+        profit_loss_pct = 0.0
+        if has_user_position and user_cost > 0:
+            profit_loss = (current_price - user_cost) * user_shares
+            profit_loss_pct = (current_price - user_cost) / user_cost * 100
+        
         print(f"\n>>> {strategy_name}")
         print(f"    历史收益: {total_return:.2f}% | 年化收益: {annual_return:.2f}%")
         print(f"    当前价格: {current_price:.2f}")
         print(f"    当前信号: {sig} | 信号强度: {confidence:.0f}%")
         print(f"    趋势判断: {trend.get('trend', 'N/A')} (强度: {trend.get('strength', 'N/A')})")
         
-        # 根据策略类型和信号给出具体操作建议
+        # 显示持仓和盈亏信息
+        if has_user_position:
+            if user_cost > 0:
+                profit_status = "盈利" if profit_loss >= 0 else "亏损"
+                print(f"    您的持仓: {user_shares}股 | 成本价: {user_cost:.2f}元 | 市值: {user_shares * current_price:,.0f}元")
+                print(f"    持仓盈亏: {profit_loss:+,.0f}元 ({profit_loss_pct:+.2f}%) - {profit_status}")
+            else:
+                print(f"    您的持仓: {user_shares}股 | 市值: {user_shares * current_price:,.0f}元 (未提供成本价)")
+        else:
+            print(f"    您的持仓: 空仓")
+        
+        # 根据策略类型、信号和用户实际持仓状态给出具体操作建议
         if sig == '买入':
-            print(f"    ★★★ 操作建议: 买入 ★★★")
-            print(f"    参考买入价: {current_price:.2f} 元")
-            # 根据不同策略给出止损止盈建议
-            if 'upper' in signal and 'lower' in signal:
-                print(f"    止损参考: {signal['lower']:.2f} 元 (下轨)")
-            elif 'ma_long' in signal:
-                print(f"    止损参考: {signal['ma_long']:.2f} 元 (长期均线)")
-            print(f"    建议仓位: 可分批建仓，首次 30-50%")
+            if has_user_position:
+                print(f"    ★★★ 操作建议: 继续持有或加仓 ★★★")
+                if user_cost > 0:
+                    print(f"    当前已有持仓: {user_shares}股 (成本 {user_cost:.2f}元)")
+                    if profit_loss >= 0:
+                        print(f"    当前盈利 {profit_loss_pct:+.2f}%，策略发出买入信号，可继续持有或考虑加仓")
+                    else:
+                        print(f"    当前亏损 {profit_loss_pct:.2f}%，策略发出买入信号，建议持有等待反弹")
+                else:
+                    print(f"    当前已有持仓: {user_shares}股")
+                    print(f"    建议: 策略发出买入信号，可继续持有或考虑加仓")
+            else:
+                print(f"    ★★★ 操作建议: 买入 ★★★")
+                print(f"    参考买入价: {current_price:.2f} 元")
+                # 根据不同策略给出止损止盈建议
+                if 'upper' in signal and 'lower' in signal:
+                    print(f"    止损参考: {signal['lower']:.2f} 元 (下轨)")
+                elif 'ma_long' in signal:
+                    print(f"    止损参考: {signal['ma_long']:.2f} 元 (长期均线)")
+                print(f"    建议仓位: 可分批建仓，首次 30-50%")
             
         elif sig == '卖出':
-            print(f"    ★★★ 操作建议: 卖出 ★★★")
-            print(f"    参考卖出价: {current_price:.2f} 元")
-            print(f"    建议操作: 如有持仓，建议全部卖出或减仓 70%")
+            if has_user_position:
+                print(f"    ★★★ 操作建议: 卖出 ★★★")
+                print(f"    参考卖出价: {current_price:.2f} 元")
+                print(f"    预计回笼资金: 约 {user_shares * current_price:,.0f} 元")
+                if user_cost > 0:
+                    print(f"    预计盈亏: {profit_loss:+,.0f} 元 ({profit_loss_pct:+.2f}%)")
+                    if profit_loss > 0:
+                        print(f"    当前盈利，建议卖出锁定收益")
+                    elif profit_loss < 0:
+                        print(f"    当前亏损，建议止损离场，控制风险")
+                print(f"    建议操作: 建议全部卖出或减仓 70%")
+            else:
+                print(f"    ★★★ 操作建议: 继续观望 ★★★")
+                print(f"    当前无持仓，卖出信号不适用")
+                print(f"    建议: 继续观望，等待买入机会")
             
         elif '偏买' in sig:
-            print(f"    ★★ 操作建议: 关注买入机会 ★★")
-            # 显示关键价位
-            if 'upper' in signal:
-                print(f"    突破买入价: {signal['upper']:.2f} 元")
-                print(f"    回调支撑价: {signal.get('lower', current_price * 0.95):.2f} 元")
-            elif 'ma_short' in signal and 'ma_long' in signal:
-                print(f"    参考买入价: {signal['ma_long']:.2f} 元附近 (长期均线支撑)")
-            print(f"    建议仓位: 小仓位试探 20-30%，突破后加仓")
-            print(f"    止损参考: 买入价下方 5-8%")
+            if has_user_position:
+                print(f"    ★★ 操作建议: 继续持有 ★★")
+                if user_cost > 0:
+                    print(f"    当前已有持仓: {user_shares}股 (成本 {user_cost:.2f}元)")
+                    if profit_loss > 0:
+                        print(f"    当前盈利 {profit_loss_pct:+.2f}%，建议继续持有，享受上涨趋势")
+                    else:
+                        print(f"    当前亏损 {profit_loss_pct:.2f}%，建议持有等待反弹")
+                else:
+                    print(f"    当前已有持仓: {user_shares}股")
+                    print(f"    建议: 继续持有，享受上涨趋势")
+            else:
+                print(f"    ★★ 操作建议: 关注买入机会 ★★")
+                # 显示关键价位
+                if 'upper' in signal:
+                    print(f"    突破买入价: {signal['upper']:.2f} 元")
+                    print(f"    回调支撑价: {signal.get('lower', current_price * 0.95):.2f} 元")
+                elif 'ma_short' in signal and 'ma_long' in signal:
+                    print(f"    参考买入价: {signal['ma_long']:.2f} 元附近 (长期均线支撑)")
+                print(f"    建议仓位: 小仓位试探 20-30%，突破后加仓")
+                print(f"    止损建议: 若买入后价格下跌 5-8%，考虑止损离场")
             
         elif '偏卖' in sig:
-            print(f"    ★★ 操作建议: 注意风险 ★★")
-            if 'rsi' in signal:
-                print(f"    RSI 值: {signal['rsi']:.1f} (超买区)")
-                print(f"    建议操作: 如有持仓可减仓 30-50%，等待回调")
+            if has_user_position:
+                print(f"    ★★ 操作建议: 注意风险，考虑减仓 ★★")
+                if user_cost > 0:
+                    print(f"    当前持仓: {user_shares}股 (成本 {user_cost:.2f}元)")
+                    if profit_loss > 0:
+                        print(f"    当前盈利 {profit_loss_pct:+.2f}%，建议减仓 30-50% 锁定部分收益")
+                    else:
+                        print(f"    当前亏损 {profit_loss_pct:.2f}%，建议减仓控制风险，等待更好时机")
+                else:
+                    print(f"    当前持仓: {user_shares}股")
+                
+                if 'rsi' in signal:
+                    print(f"    RSI 值: {signal['rsi']:.1f} (超买区)")
+                print(f"    止盈参考: 当前价位或上涨 3-5%")
             else:
-                print(f"    建议操作: 如有持仓可适当减仓，控制风险")
-            print(f"    止盈参考: 当前价位或上涨 3-5%")
+                print(f"    ★★ 操作建议: 继续观望 ★★")
+                print(f"    当前无持仓，偏卖信号不适用")
+                print(f"    建议: 继续观望，等待更好的买入时机")
             
         else:
-            print(f"    ★ 操作建议: 观望 ★")
-            print(f"    等待明确信号再操作")
-            print(f"    如有持仓: 继续持有，设置止损")
-            print(f"    如无持仓: 暂不操作，等待机会")
+            if has_user_position:
+                print(f"    ★ 操作建议: 继续持有 ★")
+                if user_cost > 0:
+                    print(f"    当前已有持仓: {user_shares}股 (成本 {user_cost:.2f}元)")
+                    if profit_loss > 0:
+                        print(f"    当前盈利 {profit_loss_pct:+.2f}%，建议继续持有，设置止盈保护利润")
+                        # 根据盈利比例给出不同的止盈建议
+                        if profit_loss_pct >= 15:
+                            # 盈利超过15%，建议减仓锁定部分收益
+                            print(f"    止盈建议: 已有较大盈利，建议减仓 30-50% 锁定收益")
+                            print(f"    或设置移动止盈: 当价格回落至盈利 10% 时卖出")
+                        elif profit_loss_pct >= 10:
+                            # 盈利10-15%，建议设置止盈保护
+                            print(f"    止盈建议: 可设置移动止盈，当价格回落至盈利 5-8% 时减仓")
+                        else:
+                            # 盈利10%以下，建议设置保本止损
+                            print(f"    止盈建议: 可设置保本止损，确保不亏损")
+                            print(f"    具体价位: 成本价 {user_cost:.2f} 元附近")
+                    else:
+                        print(f"    当前亏损 {profit_loss_pct:.2f}%，建议持有，设置止损控制风险")
+                        # 根据亏损比例给出不同的止损建议
+                        loss_pct = abs(profit_loss_pct)
+                        if loss_pct >= 10:
+                            # 亏损超过10%，建议考虑止损
+                            print(f"    止损建议: 亏损较大，建议考虑止损离场或减仓控制风险")
+                        elif loss_pct >= 5:
+                            # 亏损5-10%，建议设置止损线
+                            stop_loss_price = user_cost * 0.92  # 成本价下方8%
+                            print(f"    止损建议: 设置止损线在成本价下方 8-10%")
+                            print(f"    具体价位: {stop_loss_price:.2f} 元附近")
+                        else:
+                            # 亏损5%以下，可以等待反弹
+                            print(f"    止损建议: 亏损较小，可设置止损线在成本价下方 10%")
+                            stop_loss_price = user_cost * 0.90
+                            print(f"    具体价位: {stop_loss_price:.2f} 元附近")
+                else:
+                    print(f"    当前已有持仓: {user_shares}股")
+                    print(f"    建议: 继续持有，设置止损保护")
+            else:
+                print(f"    ★ 操作建议: 观望 ★")
+                print(f"    等待明确信号再操作")
+                print(f"    建议: 暂不操作，等待机会")
     
     # 综合建议
     print("\n" + "-" * 70)
@@ -380,11 +498,31 @@ def main():
         except:
             pass
     
+    # 用户实际持仓股数(可选参数)
+    user_shares = 0
+    if len(sys.argv) > 3:
+        try:
+            user_shares = int(sys.argv[3])
+        except:
+            pass
+    
+    # 用户持仓成本价(可选参数)
+    user_cost = 0.0
+    if len(sys.argv) > 4:
+        try:
+            user_cost = float(sys.argv[4])
+        except:
+            pass
+    
     print("=" * 70)
     print("量化策略分析工具")
     print("=" * 70)
     print(f"目标股票: {symbol}")
     print(f"初始资金: {capital:,} 元")
+    if user_shares > 0 and user_cost > 0:
+        print(f"用户持仓: {user_shares} 股, 成本价: {user_cost:.2f} 元")
+    elif user_shares > 0:
+        print(f"用户持仓: {user_shares} 股")
     
     # 检查数据
     print(f"\n检查本地数据...")
@@ -445,7 +583,7 @@ def main():
     results['kdj'] = run_kdj(symbol, capital)
     
     # 打印汇总
-    print_summary(results, symbol, capital)
+    print_summary(results, symbol, capital, user_shares, user_cost)
 
 
 if __name__ == "__main__":

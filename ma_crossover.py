@@ -44,7 +44,11 @@ def ma_crossover_strategy(df, short_period=5, long_period=20):
                 'position': df['position'].iloc[i]
             })
     
-    return pd.DataFrame(records).set_index('date'), df
+    # 如果没有交叉信号，返回带正确列的空 DataFrame
+    if records:
+        return pd.DataFrame(records).set_index('date'), df
+    else:
+        return pd.DataFrame(columns=['close', 'ma_short', 'ma_long', 'position']), df
 
 def get_current_signal(df, short_period=5, long_period=20):
     """获取当前买卖信号
@@ -342,7 +346,9 @@ def run(symbol=None, start_date=None, end_date=None, capital=None, short_period=
         'return': total_return,
         'annual': annual_return,
         'current_signal': current_signal,
-        'trend': trend_info
+        'trend': trend_info,
+        'current_position': current_position,
+        'current_shares': current_position
     }
 
 if __name__ == "__main__":

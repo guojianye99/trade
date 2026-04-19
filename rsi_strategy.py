@@ -63,7 +63,11 @@ def rsi_strategy(df, period=14, overbought=70, oversold=30):
                 'position': df['position'].iloc[i]
             })
     
-    return pd.DataFrame(records).set_index('date'), df
+    # 如果没有信号，返回带正确列的空 DataFrame
+    if records:
+        return pd.DataFrame(records).set_index('date'), df
+    else:
+        return pd.DataFrame(columns=['close', 'rsi', 'position']), df
 
 
 def get_current_signal(df, period=14, overbought=70, oversold=30):
@@ -315,7 +319,9 @@ def run(symbol=None, start_date=None, end_date=None, capital=None,
         'return': total_return,
         'annual': annual_return,
         'current_signal': current_signal,
-        'trend': trend_info
+        'trend': trend_info,
+        'current_position': current_position,
+        'current_shares': current_position
     }
 
 

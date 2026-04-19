@@ -79,7 +79,11 @@ def kdj_strategy(df, n=9, m1=3, m2=3):
                 'position': df['position'].iloc[i]
             })
     
-    return pd.DataFrame(records).set_index('date'), df
+    # 如果没有信号，返回带正确列的空 DataFrame
+    if records:
+        return pd.DataFrame(records).set_index('date'), df
+    else:
+        return pd.DataFrame(columns=['close', 'k', 'd', 'j', 'position']), df
 
 
 def get_current_signal(df, n=9, m1=3, m2=3):
@@ -352,7 +356,9 @@ def run(symbol=None, start_date=None, end_date=None, capital=None,
         'return': total_return,
         'annual': annual_return if 'annual_return' in dir() else 0,
         'current_signal': current_signal,
-        'trend': trend_info
+        'trend': trend_info,
+        'current_position': current_position,
+        'current_shares': current_position
     }
 
 

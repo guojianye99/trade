@@ -379,7 +379,9 @@ def run(symbol=None, start_date=None, end_date=None, capital=None, k=0.5):
         'return': total_return,
         'annual': annual_return,
         'current_signal': current_signal,
-        'trend': trend_info
+        'trend': trend_info,
+        'current_position': current_position,
+        'current_shares': current_position
     }
 
 if __name__ == "__main__":
